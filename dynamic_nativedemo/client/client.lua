@@ -18,6 +18,7 @@ end
 function initTelemetryVars()
     local telemetryDataThisFrame = dynamic:getTelemetryData()
     tcsActive, escActive= dynamic:getAssists()
+    antilagActive = dynamic:getAntilag()
     tcsLevel =telemetryDataThisFrame.tcsLevel
     currentWheelIndex = 1
 end
@@ -383,7 +384,6 @@ Citizen.CreateThread(function()
             local wheelData = dynamic:getWheelData()[currentWheelIndex]
 
             WarMenu.Button("Speed (MS): "..round(wheelData.speed,2))
-            WarMenu.Button("Traction Vec Value (Mag): "..round(wheelData.tractionVector,2))
             WarMenu.Button("Load (KG): "..round(wheelData.wheelLoad,2))
             WarMenu.Button("Slip Angle (Deg): "..round(wheelData.slipAngle,2))
             WarMenu.Button("Slip Ratio (%): "..round(wheelData.slipRatio,2))
@@ -595,6 +595,12 @@ Citizen.CreateThread(function()
                 end
             )
 
+            local antiLag = WarMenu.CheckBox("Toggle Antilag",antilagActive)
+            if WarMenu.IsItemHovered() then
+                WarMenu.ToolTip('Toggles the Antilag System (Make sure to set a turbo for it to work.)',nil,true)
+            end
+    
+            if antiLag then antilagActive = dynamic:toggleAntilag() end
 
             local applyTunePressed = WarMenu.Button("Apply Tune")
             if WarMenu.IsItemHovered() then
@@ -603,7 +609,20 @@ Citizen.CreateThread(function()
             if applyTunePressed then 
                 local engineSwap = currentAvailableEngines[selectedEngineIdx]
                 local tyreSwap = currentAvailableTyres[selectedTyreIdx]
-                dynamic:loadTunedSetup(engineSwap,currentTransmissionData,tyreSwap,currentPowerMulti,currnetWeightMulti,currentBrakeMulti)
+
+                local currentCarModel = GetEntityModel(GetVehiclePedIsIn(PlayerPedId(),false))
+                local currentCarData = dynamic:getVehicleData(currentCarModel)
+                local enigneData = dynamic:getEngineData(engineSwap)
+                
+                local isEngineTurboCharged = false
+
+                if (currentCarData.forcedInduction.isTurbocharged == true) or (engineSwap ~= 'stock' and enigneData.forcedInduction.isTurbocharged == true) then
+                    isEngineTurboCharged = true
+                end
+
+                local hasTurbo = IsToggleModOn(vehicle, 18) or isEngineTurboCharged
+
+                dynamic:loadTunedSetup(engineSwap,currentTransmissionData,tyreSwap,currentPowerMulti,currnetWeightMulti,currentBrakeMulti,hasTurbo)
             end
         elseif WarMenu.Begin('tyreMenu') then
             local warmUpTyresPressed = WarMenu.Button("Warm Up Tyres")
